@@ -1,0 +1,85 @@
+-- NÚMERO DE EVENTOS, DETECCOES, SEVERIDADE MÉDIA DIÁRIA E ÁREA DE EVENTOS PARA MESOBACIA
+-- Consulta a ser realizada no banco espelho para período especifico a ser definido no Passo 01 e Passo 03
+-- Consulta alternativa para ST_Intersects com polígono não existente no banco da consulta. Inserir polígono no Passo 02 
+
+-- Passo 01 Criação de uma tabela de datas temporária para o intervalo especificado
+WITH RECURSIVE DateRange AS ( 
+    	SELECT '2021-01-01'::date AS dt    -- DEFINIR DATA DE INICIO DO RANGER
+    	UNION ALL 
+    	SELECT (dt + INTERVAL '1 day')::date 
+    	FROM DateRange 
+    	WHERE (dt + INTERVAL '1 day') <= '2025-01-01'::date  --DEFINIR DATA FINAL DO RANGER
+), 
+
+--União mv_indicadores_queimadas e mv_indicadores_queimadas2	
+
+mv_indicadores_full AS (
+	SELECT 
+		id,
+		id_evento,
+		id_status_evento,
+		dt_passagem,
+		dt_min_evento,
+	        geom_acumulada,
+		area_acumulada_ha,
+		delta_area_ha,
+    		peso_global_passagem
+	FROM queimadas.mv_indicadores_queimadas
+	UNION
+	SELECT 
+		id,
+		id_evento,
+		id_status_evento,
+		dt_passagem,
+		dt_min_evento,
+	        geom_acumulada,
+ 		area_acumulada_ha,
+		delta_area_ha,
+    		peso_global_passagem
+	FROM queimadas.mv_indicadores_queimadas2
+),  
+
+
+
+--Passo 02 Poligono Área de interesse
+pol_01 AS (
+SELECT ST_GeomFromText('MULTIPOLYGON(((COPIAR AQUI WKT DO GEOM)))', 4674) AS geom -- Colar texto no local indicado com dados do poligono(geom) convertido para formato WKT 
+),
+
+
+
+-- Passo 03 Sub consulta para eventos acumulados, detecções, área de influencia diária e severidade média diária
+sub_consulta01 AS (
+SELECT 
+  	TO_CHAR(dt_passagem::date, 'YYYY/MM/DD') as data,
+        COUNT(CASE WHEN dt_min_evento = dt_passagem THEN dt_min_evento ELSE NULL END) as num_eventos,
+  	COUNT(*) as deteccoes,
+        SUM(CASE WHEN dt_passagem = dt_min_evento THEN area_acumulada_ha ELSE delta_area_ha END)::double precision as area_influen_ha,
+        AVG("peso_global_passagem") as severidade_media
+FROM 
+  	mv_indicadores_full mv2
+
+WHERE  
+	ST_Intersects( mv2.geom_acumulada, (SELECT geom FROM pol_01) )
+	AND DATE(dt_passagem::date) BETWEEN '2021-01-01' AND '2025-01-01' -- DEFINIR O PERÍODO A SER INVESTIGADO 
+
+GROUP BY 
+  	data
+)
+
+
+-- Passo 04 Consulta principal que combina consultas acima
+SELECT  
+    	dr.dt AS "Data", 
+	COALESCE(sb1.num_eventos, 0) AS "Num. de Eventos",
+	COALESCE(sb1.deteccoes, 0) AS "Num. de Deteccoes",
+	COALESCE(sb1.area_influen_ha, 0) AS "Area de influencia",
+  	COALESCE(sb1.severidade_media, 0) AS "Severidade Media Diaria"
+FROM  
+	DateRange dr 
+LEFT JOIN
+    	sub_consulta01 sb1
+ON  
+    	dr.dt = sb1.data
+ORDER BY  
+    	dr.dt ASC; 
