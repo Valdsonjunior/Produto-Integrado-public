@@ -1,4 +1,4 @@
--- NÚMERO DE EVENTOS, DETECCOES, SEVERIDADE MÉDIA DIÁRIA E ÁREA DE EVENTOS PARA MESOBACIA e MICROBACIAS
+-- NÚMERO DE EVENTOS, DETECCOES, SEVERIDADE MÉDIA DIÁRIA E ÁREA DE EVENTOS PARA Micro Bacia Alto Juruena 
 -- Consulta a ser realizada no banco espelho para período especifico a ser definido no Passo 01 e Passo 03
 -- Consulta alternativa para ST_Intersects com polígono não existente no banco da consulta. Inserir polígono no Passo 02 
 
